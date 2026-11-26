@@ -1,317 +1,282 @@
-
 import pytest
+from datetime import date, timedelta
 
-from app import (
-    pacientes,
-    medicos,
-    consultas,
-    cadastrar_paciente,
-    cadastrar_medico,
-    agendar_consulta,
-    cancelar_consulta,
-    verificar_disponibilidade,
-    buscar_consulta
+from src.regras import (
+    alunos,
+    planos,
+    matriculas,
+    cadastrar_aluno,
+    cadastrar_plano,
+    matricular_aluno,
+    cancelar_matricula,
+    verificar_validade_plano,
+    buscar_matricula
 )
 
 
-# LIMPAR OS DADOS ANTES DE CADA TESTE
-
 @pytest.fixture(autouse=True)
 def limpar_dados():
-    pacientes.clear()
-    medicos.clear()
-    consultas.clear()
+    alunos.clear()
+    planos.clear()
+    matriculas.clear()
 
 
-# FUNÇÕES AUXILIARES PARA OS TESTES
+def criar_matricula_teste():
+    aluno = cadastrar_aluno("Joao", "12345678900")
+    plano = cadastrar_plano("Mensal", 100, 30)
 
-def criar_paciente():
-    return cadastrar_paciente("João Silva", "12345678900")
-
-
-def criar_medico():
-    return cadastrar_medico(
-        "Carlos Oliveira", "12345", "Cardiologia"
-    )
+    return matricular_aluno(aluno["id"], plano["id"])
 
 
-def criar_consulta():
-    paciente = criar_paciente()
-    medico = criar_medico()
+# ==========================================
+# 1. TESTES DE CADASTRO DE ALUNO
+# ==========================================
 
-    return agendar_consulta(
-        paciente["id"],
-        medico["id"],
-        "2026-12-01T14:00:00"
-    )
+def test_cadastrar_aluno_sucesso():
+    # Arrange
+    nome = "Joao"
+    cpf = "12345678900"
 
+    # Act
+    resultado = cadastrar_aluno(nome, cpf)
 
-# =====================================
-# 1. TESTES DE CADASTRAR PACIENTE
-# =====================================
-
-def test_cadastrar_paciente_sucesso():
-    resultado = cadastrar_paciente("João Silva", "12345678900")
-
-    assert resultado["nome"] == "João Silva"
-    assert resultado["cpf"] == "12345678900"
+    # Assert
+    assert resultado["nome"] == nome
+    assert resultado["cpf"] == cpf
+    assert resultado["id"] == 1
 
 
-def test_cadastrar_paciente_com_espacos():
-    resultado = cadastrar_paciente(" João Silva ", " 123 ")
-
-    assert resultado["nome"] == "João Silva"
-    assert resultado["cpf"] == "123"
-
-
-def test_cadastrar_paciente_sem_nome():
+@pytest.mark.parametrize("nome, cpf", [
+    ("", "12345678900"),
+    ("Joao", ""),
+    ("   ", "12345678900")
+])
+def test_cadastrar_aluno_dados_invalidos(nome, cpf):
     with pytest.raises(ValueError):
-        cadastrar_paciente("", "12345678900")
+        cadastrar_aluno(nome, cpf)
 
 
-def test_cadastrar_paciente_sem_cpf():
-    with pytest.raises(ValueError):
-        cadastrar_paciente("João Silva", "")
-
-
-def test_cadastrar_paciente_duplicado():
-    cadastrar_paciente("João Silva", "12345678900")
+def test_cadastrar_aluno_cpf_duplicado():
+    cadastrar_aluno("Joao", "12345678900")
 
     with pytest.raises(ValueError):
-        cadastrar_paciente("Maria Silva", "12345678900")
+        cadastrar_aluno("Maria", "12345678900")
 
 
-# =====================================
-# 2. TESTES DE CADASTRAR MÉDICO
-# =====================================
+def test_cadastrar_aluno_remover_espacos():
+    resultado = cadastrar_aluno("  Joao  ", "12345678900")
 
-def test_cadastrar_medico_sucesso():
-    resultado = criar_medico()
-
-    assert resultado["nome"] == "Carlos Oliveira"
-    assert resultado["crm"] == "12345"
-    assert resultado["especialidade"] == "Cardiologia"
+    assert resultado["nome"] == "Joao"
 
 
-def test_cadastrar_medico_com_espacos():
-    resultado = cadastrar_medico(
-        " Carlos ", " 123 ", " Cardiologia "
-    )
+# ==========================================
+# 2. TESTES DE CADASTRO DE PLANO
+# ==========================================
 
-    assert resultado["nome"] == "Carlos"
-    assert resultado["crm"] == "123"
-    assert resultado["especialidade"] == "Cardiologia"
+def test_cadastrar_plano_sucesso():
+    # Arrange
+    nome = "Mensal"
+    valor = 100
+    duracao = 30
+
+    # Act
+    resultado = cadastrar_plano(nome, valor, duracao)
+
+    # Assert
+    assert resultado["nome"] == nome
+    assert resultado["valor"] == valor
+    assert resultado["duracao"] == duracao
 
 
-def test_cadastrar_medico_sem_nome():
+@pytest.mark.parametrize("valor", [-100, 0])
+def test_cadastrar_plano_valor_invalido(valor):
     with pytest.raises(ValueError):
-        cadastrar_medico("", "12345", "Cardiologia")
+        cadastrar_plano("Mensal", valor, 30)
 
 
-def test_cadastrar_medico_sem_crm():
+@pytest.mark.parametrize("duracao", [-1, 0])
+def test_cadastrar_plano_duracao_invalida(duracao):
     with pytest.raises(ValueError):
-        cadastrar_medico("Carlos", "", "Cardiologia")
+        cadastrar_plano("Mensal", 100, duracao)
 
 
-def test_cadastrar_medico_duplicado():
-    criar_medico()
+def test_cadastrar_plano_nome_vazio():
+    with pytest.raises(ValueError):
+        cadastrar_plano("", 100, 30)
+
+
+def test_cadastrar_plano_valor_limite():
+    resultado = cadastrar_plano("Diario", 0.01, 1)
+
+    assert resultado["valor"] == 0.01
+    assert resultado["duracao"] == 1
+
+
+# ==========================================
+# 3. TESTES DE MATRICULA
+# ==========================================
+
+def test_matricular_aluno_sucesso():
+    # Arrange
+    aluno = cadastrar_aluno("Joao", "12345678900")
+    plano = cadastrar_plano("Mensal", 100, 30)
+
+    # Act
+    resultado = matricular_aluno(aluno["id"], plano["id"])
+
+    # Assert
+    assert resultado["aluno_id"] == aluno["id"]
+    assert resultado["plano_id"] == plano["id"]
+    assert resultado["ativa"] is True
+
+
+def test_matricular_aluno_inexistente():
+    plano = cadastrar_plano("Mensal", 100, 30)
 
     with pytest.raises(ValueError):
-        cadastrar_medico(
-            "Outro Médico", "12345", "Neurologia"
+        matricular_aluno(999, plano["id"])
+
+
+def test_matricular_plano_inexistente():
+    aluno = cadastrar_aluno("Joao", "12345678900")
+
+    with pytest.raises(ValueError):
+        matricular_aluno(aluno["id"], 999)
+
+
+def test_matricula_duplicada():
+    matricula = criar_matricula_teste()
+
+    with pytest.raises(ValueError):
+        matricular_aluno(
+            matricula["aluno_id"],
+            matricula["plano_id"]
         )
 
 
-# =====================================
-# 3. TESTES DE VERIFICAR DISPONIBILIDADE
-# =====================================
+def test_matricular_apos_cancelamento():
+    matricula = criar_matricula_teste()
 
-def test_verificar_horario_disponivel():
-    medico = criar_medico()
+    cancelar_matricula(matricula["id"])
 
-    resultado = verificar_disponibilidade(
-        medico["id"], "2026-12-01T14:00:00"
+    nova = matricular_aluno(
+        matricula["aluno_id"],
+        matricula["plano_id"]
     )
+
+    assert nova["ativa"] is True
+    assert nova["id"] != matricula["id"]
+
+
+def test_data_vencimento_matricula():
+    matricula = criar_matricula_teste()
+
+    esperado = date.today() + timedelta(days=30)
+
+    assert matricula["vencimento"] == esperado.isoformat()
+
+
+# ==========================================
+# 4. TESTES DE CANCELAMENTO
+# ==========================================
+
+def test_cancelar_matricula_sucesso():
+    # Arrange
+    matricula = criar_matricula_teste()
+
+    # Act
+    resultado = cancelar_matricula(matricula["id"])
+
+    # Assert
+    assert resultado["ativa"] is False
+
+
+@pytest.mark.parametrize("matricula_id", [0, -1, 999])
+def test_cancelar_matricula_inexistente(matricula_id):
+    with pytest.raises(ValueError):
+        cancelar_matricula(matricula_id)
+
+
+def test_cancelar_matricula_duas_vezes():
+    matricula = criar_matricula_teste()
+
+    cancelar_matricula(matricula["id"])
+
+    with pytest.raises(ValueError):
+        cancelar_matricula(matricula["id"])
+
+
+# ==========================================
+# 5. TESTES DE VALIDADE DO PLANO
+# ==========================================
+
+def test_plano_valido():
+    matricula = criar_matricula_teste()
+
+    resultado = verificar_validade_plano(matricula["id"])
 
     assert resultado is True
 
 
-def test_verificar_medico_inexistente():
+def test_plano_cancelado():
+    matricula = criar_matricula_teste()
+
+    cancelar_matricula(matricula["id"])
+
+    assert verificar_validade_plano(matricula["id"]) is False
+
+
+@pytest.mark.parametrize("dias, esperado", [
+    (-1, False),
+    (0, False),
+    (1, True)
+])
+def test_validade_fronteira(dias, esperado):
+    # Arrange
+    matricula = criar_matricula_teste()
+
+    matricula["vencimento"] = (
+        date.today() + timedelta(days=dias)
+    ).isoformat()
+
+    # Act
+    resultado = verificar_validade_plano(matricula["id"])
+
+    # Assert
+    assert resultado is esperado
+
+
+def test_verificar_matricula_inexistente():
     with pytest.raises(ValueError):
-        verificar_disponibilidade(
-            99, "2026-12-01T14:00:00"
-        )
+        verificar_validade_plano(999)
 
 
-def test_verificar_data_invalida():
-    medico = criar_medico()
+# ==========================================
+# 6. TESTES DE BUSCA DE MATRICULA
+# ==========================================
 
+def test_buscar_matricula_sucesso():
+    # Arrange
+    matricula = criar_matricula_teste()
+
+    # Act
+    resultado = buscar_matricula(matricula["id"])
+
+    # Assert
+    assert resultado == matricula
+
+
+@pytest.mark.parametrize("matricula_id", [0, -1, 999])
+def test_buscar_matricula_inexistente(matricula_id):
     with pytest.raises(ValueError):
-        verificar_disponibilidade(
-            medico["id"], "data-invalida"
-        )
+        buscar_matricula(matricula_id)
 
 
-def test_verificar_horario_ocupado():
-    consulta = criar_consulta()
+def test_buscar_matricula_cancelada():
+    matricula = criar_matricula_teste()
 
-    resultado = verificar_disponibilidade(
-        consulta["medico_id"],
-        consulta["data_hora"]
-    )
+    cancelar_matricula(matricula["id"])
 
-    assert resultado is False
+    resultado = buscar_matricula(matricula["id"])
 
-
-def test_verificar_horario_apos_cancelamento():
-    consulta = criar_consulta()
-
-    cancelar_consulta(consulta["id"])
-
-    resultado = verificar_disponibilidade(
-        consulta["medico_id"],
-        consulta["data_hora"]
-    )
-
-    assert resultado is True
-
-
-# =====================================
-# 4. TESTES DE AGENDAR CONSULTA
-# =====================================
-
-def test_agendar_consulta_sucesso():
-    paciente = criar_paciente()
-    medico = criar_medico()
-
-    resultado = agendar_consulta(
-        paciente["id"],
-        medico["id"],
-        "2026-12-01T14:00:00"
-    )
-
-    assert resultado["status"] == "agendada"
-    assert resultado["paciente_id"] == paciente["id"]
-    assert resultado["medico_id"] == medico["id"]
-
-
-def test_agendar_consulta_paciente_inexistente():
-    medico = criar_medico()
-
-    with pytest.raises(ValueError):
-        agendar_consulta(
-            99, medico["id"], "2026-12-01T14:00:00"
-        )
-
-
-def test_agendar_consulta_medico_inexistente():
-    paciente = criar_paciente()
-
-    with pytest.raises(ValueError):
-        agendar_consulta(
-            paciente["id"], 99, "2026-12-01T14:00:00"
-        )
-
-
-def test_agendar_consulta_data_invalida():
-    paciente = criar_paciente()
-    medico = criar_medico()
-
-    with pytest.raises(ValueError):
-        agendar_consulta(
-            paciente["id"], medico["id"], "data-invalida"
-        )
-
-
-def test_agendar_consulta_horario_ocupado():
-    criar_consulta()
-
-    with pytest.raises(ValueError):
-        agendar_consulta(
-            1, 1, "2026-12-01T14:00:00"
-        )
-
-
-# =====================================
-# 5. TESTES DE CANCELAR CONSULTA
-# =====================================
-
-def test_cancelar_consulta_sucesso():
-    consulta = criar_consulta()
-
-    resultado = cancelar_consulta(consulta["id"])
-
-    assert resultado["status"] == "cancelada"
-
-
-def test_cancelar_consulta_inexistente():
-    with pytest.raises(ValueError):
-        cancelar_consulta(99)
-
-
-def test_cancelar_consulta_ja_cancelada():
-    consulta = criar_consulta()
-
-    cancelar_consulta(consulta["id"])
-
-    with pytest.raises(ValueError):
-        cancelar_consulta(consulta["id"])
-
-
-def test_cancelar_consulta_mantem_identificador():
-    consulta = criar_consulta()
-
-    resultado = cancelar_consulta(consulta["id"])
-
-    assert resultado["id"] == consulta["id"]
-
-
-def test_cancelar_consulta_mantem_paciente():
-    consulta = criar_consulta()
-
-    resultado = cancelar_consulta(consulta["id"])
-
-    assert resultado["paciente_id"] == consulta["paciente_id"]
-
-
-# =====================================
-# 6. TESTES DE BUSCAR CONSULTA
-# =====================================
-
-def test_buscar_consulta_sucesso():
-    consulta = criar_consulta()
-
-    resultado = buscar_consulta(consulta["id"])
-
-    assert resultado["id"] == consulta["id"]
-
-
-def test_buscar_consulta_inexistente():
-    with pytest.raises(ValueError):
-        buscar_consulta(99)
-
-
-def test_buscar_consulta_retorna_paciente():
-    consulta = criar_consulta()
-
-    resultado = buscar_consulta(consulta["id"])
-
-    assert resultado["paciente_id"] == 1
-
-
-def test_buscar_consulta_retorna_medico():
-    consulta = criar_consulta()
-
-    resultado = buscar_consulta(consulta["id"])
-
-    assert resultado["medico_id"] == 1
-
-
-def test_buscar_consulta_cancelada():
-    consulta = criar_consulta()
-
-    cancelar_consulta(consulta["id"])
-
-    resultado = buscar_consulta(consulta["id"])
-
-    assert resultado["status"] == "cancelada"
+    assert resultado["ativa"] is False
